@@ -39,6 +39,7 @@ optional arguments:
   --cuda             use CUDA
   --log-interval N   report interval
   --save SAVE        path to save the final model
+  --dict DICT       path to save/load the dictionary
 ```
 
 With these arguments, a variety of models can be tested.
