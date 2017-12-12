@@ -42,6 +42,8 @@ parser.add_argument('--log-interval', type=int, default=200, metavar='N',
                     help='report interval')
 parser.add_argument('--save', type=str,  default='model.pt',
                     help='path to save the final model')
+parser.add_argument('--dict', type=str, default=None,
+                    help='save or load dictionary. save if file does not exists. Otherwise write')
 args = parser.parse_args()
 
 # Set the random seed manually for reproducibility.
@@ -56,7 +58,7 @@ if torch.cuda.is_available():
 # Load data
 ###############################################################################
 
-corpus = data.Corpus(args.data)
+corpus = data.Corpus(args.data, args.dict)
 
 # Starting from sequential data, batchify arranges the dataset into columns.
 # For instance, with the alphabet as the sequence and batch size 4, we'd get
@@ -149,9 +151,11 @@ def train():
     ntokens = len(corpus.dictionary)
     hidden = model.init_hidden(args.batch_size)
     for batch, i in enumerate(range(0, train_data.size(0) - 1, args.bptt)):
+        print('batch',batch)
         data, targets = get_batch(train_data, i)
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
+        
         hidden = repackage_hidden(hidden)
         model.zero_grad()
         output, hidden = model(data, hidden)
@@ -162,7 +166,6 @@ def train():
         torch.nn.utils.clip_grad_norm(model.parameters(), args.clip)
         for p in model.parameters():
             p.data.add_(-lr, p.grad.data)
-
         total_loss += loss.data
 
         if batch % args.log_interval == 0 and batch > 0:
@@ -174,6 +177,7 @@ def train():
                 elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()
+
 
 # Loop over epochs.
 lr = args.lr

@@ -1,48 +1,25 @@
 import os
 import torch
-
-class Dictionary(object):
-    def __init__(self):
-        self.word2idx = {}
-        self.idx2word = []
-
-    def add_word(self, word):
-        if word not in self.word2idx:
-            self.idx2word.append(word)
-            self.word2idx[word] = len(self.idx2word) - 1
-        return self.word2idx[word]
-
-    def __len__(self):
-        return len(self.idx2word)
-
+from itertools import chain 
+from gensim.corpora.dictionary import Dictionary
 
 class Corpus(object):
-    def __init__(self, path):
+    def __init__(self, path, dict_path):
         self.dictionary = Dictionary()
+        if dict_path and os.path.exists(dict_path):
+                print('loading dictionary')
+                self.dictionary.load(dict_path)
         self.train = self.tokenize(os.path.join(path, 'train.txt'))
         self.valid = self.tokenize(os.path.join(path, 'valid.txt'))
         self.test = self.tokenize(os.path.join(path, 'test.txt'))
+        if dict_path and not os.path.exists(dict_path):
+            self.dictionary.save(dict_path)
 
     def tokenize(self, path):
         """Tokenizes a text file."""
         assert os.path.exists(path)
-        # Add words to the dictionary
-        with open(path, 'r') as f:
-            tokens = 0
-            for line in f:
-                words = line.split() + ['<eos>']
-                tokens += len(words)
-                for word in words:
-                    self.dictionary.add_word(word)
+        all_words = list(chain.from_iterable(
+            [sent.split() + ['<eos>'] for sent in open(path).read().split('\n')]))
+        self.dictionary.add_documents([all_words])
+        return torch.LongTensor(self.dictionary.doc2idx(all_words))
 
-        # Tokenize file content
-        with open(path, 'r') as f:
-            ids = torch.LongTensor(tokens)
-            token = 0
-            for line in f:
-                words = line.split() + ['<eos>']
-                for word in words:
-                    ids[token] = self.dictionary.word2idx[word]
-                    token += 1
-
-        return ids
