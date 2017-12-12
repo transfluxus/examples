@@ -9,11 +9,11 @@ class Corpus(object):
         add_to_dict = True
         if dict_path and os.path.exists(dict_path):
             print('loading dictionary')
-            self.dictionary.load(dict_path)
+            self.dictionary = self.dictionary.load(dict_path)
             add_to_dict = False
-        self.train = self.tokenize(os.path.join(path, 'train.txt', add_to_dict))
-        self.valid = self.tokenize(os.path.join(path, 'valid.txt', add_to_dict))
-        self.test = self.tokenize(os.path.join(path, 'test.txt', add_to_dict))
+        self.train = self.tokenize(os.path.join(path, 'train.txt'), add_to_dict)
+        self.valid = self.tokenize(os.path.join(path, 'valid.txt'), add_to_dict)
+        self.test = self.tokenize(os.path.join(path, 'test.txt'), add_to_dict)
         if dict_path and not os.path.exists(dict_path):
             self.dictionary.save(dict_path)
 
