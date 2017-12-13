@@ -9,7 +9,7 @@ from torch.autograd import Variable
 import data
 import model
 from trainlogger import TrainLogger
-
+from gensim.models.word2vec import Word2Vec, KeyedVectors
 
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM Language Model')
 parser.add_argument('--data', type=str, default='./data/wikitext-2',
@@ -46,6 +46,8 @@ parser.add_argument('--save', type=str,  default='model.pt',
                     help='path to save the final model')
 parser.add_argument('--dict', type=str, default=None,
                     help='save or load dictionary. save if file does not exists. Otherwise write')
+parser.add_argument('--wem', type=str,  default=None,
+                    help='use word-embedding')
 args = parser.parse_args()
 
 # Set the random seed manually for reproducibility.
@@ -60,7 +62,10 @@ if torch.cuda.is_available():
 # Load data
 ###############################################################################
 
-corpus = data.Corpus(args.data, args.dict)
+wem_model = None
+if args.wem:
+    wem_model = KeyedVectors.load(args.wem)
+corpus = data.Corpus(args.data, args.dict, wem_model)
 
 # Starting from sequential data, batchify arranges the dataset into columns.
 # For instance, with the alphabet as the sequence and batch size 4, we'd get
@@ -80,12 +85,14 @@ def batchify(data, bsz):
     # Trim off any extra elements that wouldn't cleanly fit (remainders).
     data = data.narrow(0, 0, nbatch * bsz)
     # Evenly divide the data across the bsz batches.
-    data = data.view(bsz, -1).t().contiguous()
+    # 200 should be emsize
+    data = data.view(bsz, -1, 200).transpose(1,0).contiguous()
     if args.cuda:
         data = data.cuda()
     return data
 
 eval_batch_size = 10
+
 train_data = batchify(corpus.train, args.batch_size)
 val_data = batchify(corpus.valid, eval_batch_size)
 test_data = batchify(corpus.test, eval_batch_size)
@@ -94,13 +101,15 @@ test_data = batchify(corpus.test, eval_batch_size)
 # Build the model
 ###############################################################################
 
-ntokens = len(corpus.dictionary)
-model = model.RNNModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, args.dropout, args.tied)
+ntokens = corpus.dict_size()
+model = model.RNNModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, args.dropout, args.tied, wem_model)
 if args.cuda:
     model.cuda()
 
-criterion = nn.CrossEntropyLoss()
-
+if args.wem:
+    criterion = nn.MSELoss()
+else:
+    criterion = nn.CrossEntropyLoss()
 ###############################################################################
 # Training code
 ###############################################################################
@@ -126,7 +135,7 @@ def repackage_hidden(h):
 def get_batch(source, i, evaluation=False):
     seq_len = min(args.bptt, len(source) - 1 - i)
     data = Variable(source[i:i+seq_len], volatile=evaluation)
-    target = Variable(source[i+1:i+1+seq_len].view(-1))
+    target = Variable(source[i+1:i+1+seq_len])
     return data, target
 
 
@@ -147,15 +156,15 @@ def evaluate(data_source):
 total_batches = 0
 
 def train():
-    global total_batches
+    global total_batches, ntokens
     # Turn on training mode which enables dropout.
     model.train()
     total_loss = 0
     start_time = time.time()
-    ntokens = len(corpus.dictionary)
+    # ntokens = len(corpus.dictionary)
     hidden = model.init_hidden(args.batch_size)
     for batch, i in enumerate(range(0, train_data.size(0) - 1, args.bptt)):
-        print('batch',batch)
+        # print('batch',batch)
         data, targets = get_batch(train_data, i)
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
@@ -163,7 +172,19 @@ def train():
         hidden = repackage_hidden(hidden)
         model.zero_grad()
         output, hidden = model(data, hidden)
-        loss = criterion(output.view(-1, ntokens), targets)
+        # print("output",output.data.view(-1,ntokens).shape)
+        # print(output.view(-1, ntokens)[0])
+        # print(output.view(-1, ntokens)[0][targets[0]])
+        # print('targets',targets.data.shape)
+        # print(targets[0])
+        if not args.wem:
+            loss = criterion(output.view(-1, ntokens), targets)
+        else:
+            # PROBLEM/ LOSING VARIABLE
+            # target_emb = torch.FloatTensor(len(targets), args.emsize).zero_()
+            # for ind, t in enumerate(target):
+            #     target_emb[ind] = torch.FloatTensor(wem_model.wv.syn0[l])
+            loss = criterion(output,targets)
         loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
