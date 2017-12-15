@@ -32,10 +32,8 @@ class Corpus(object):
             [sent.split() + ['<eos>'] for sent in open(path).read().split('\n')]))
         if add_to_dict:
             self.dictionary.add_documents([all_words])
-        if self.wem_model:
-            return torch.from_numpy(np.array([self.wem_model.wv[word] for word in all_words]))
-        else:
-            return torch.LongTensor(self.dictionary.doc2idx(all_words))
+        return torch.from_numpy(np.array([self.wem_model.wv[word] for word in all_words]))
+
 
 
     def dict_size(self):

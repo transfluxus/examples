@@ -17,3 +17,4 @@ word_language_model_orig/model.pt
 word_language_model_orig/model.py
 word_language_model_orig/requirements.txt
 README.md
+word_language_model/logs
