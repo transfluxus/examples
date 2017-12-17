@@ -17,3 +17,9 @@ word_language_model_orig/model.py
 word_language_model_orig/requirements.txt
 README.md
 word_language_model/logs
+word_language_model_messed/data/chomsky
+word_language_model_messed
+word_language_model_orig/data/wikitext-2/README
+word_language_model_orig/data/wikitext-2/test.txt
+word_language_model_orig/data/wikitext-2/train.txt
+word_language_model_orig/data/wikitext-2/valid.txt
